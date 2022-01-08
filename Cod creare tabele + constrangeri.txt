@@ -1,0 +1,262 @@
+CREATE TABLE boala (
+    id_boala   NUMBER(2) NOT NULL,
+    denumire   VARCHAR2(20) NOT NULL,
+    severitate VARCHAR2(20) NOT NULL
+)
+LOGGING;
+
+ALTER TABLE boala
+    ADD CONSTRAINT boala_denumire_ck CHECK ( length(denumire) > 2 );
+
+ALTER TABLE boala
+    ADD CONSTRAINT boala_severitate_ck CHECK ( severitate IN ( 'grav', 'moderat', 'usor' ) );
+
+ALTER TABLE boala ADD CONSTRAINT boala_pk PRIMARY KEY ( id_boala );
+
+ALTER TABLE boala ADD CONSTRAINT boala_denumire_severitate_un UNIQUE ( denumire,
+                                                                       severitate );
+
+CREATE TABLE cont (
+    pacient_id_pacient NUMBER(2) NOT NULL,
+    nr_card            CHAR(16) NOT NULL,
+    suma_disponibila   NUMBER(4) NOT NULL
+)
+LOGGING;
+
+ALTER TABLE cont
+    ADD CONSTRAINT cont_nr_card_ck CHECK ( length(nr_card) = 16
+                                           AND REGEXP_LIKE ( nr_card,
+                                                             '[0-9]+' ) );
+
+ALTER TABLE cont ADD CONSTRAINT cont_suma_disponibila_ck CHECK ( suma_disponibila > 0 );
+
+ALTER TABLE cont ADD CONSTRAINT cont_pk PRIMARY KEY ( pacient_id_pacient );
+
+ALTER TABLE cont ADD CONSTRAINT cont_nr_card_un UNIQUE ( nr_card );
+
+CREATE TABLE internare (
+    nr_internare         NUMBER(4) NOT NULL,
+    data_internare       DATE NOT NULL,
+    pacient_id_pacient   NUMBER(2) NOT NULL,
+    sectie_id_sectie     NUMBER(2) NOT NULL,
+    boala_id_boala       NUMBER(2) NOT NULL,
+    manopera_id_manopera NUMBER(2) NOT NULL
+)
+LOGGING;
+
+ALTER TABLE internare ADD CONSTRAINT internare_pk PRIMARY KEY ( nr_internare );
+
+CREATE TABLE internare_medicament_relmxn (
+    internare_nr_internare   NUMBER(4) NOT NULL,
+    medicament_id_medicament NUMBER(2) NOT NULL,
+    cantitate                NUMBER(2) NOT NULL,
+    data_administrare        DATE NOT NULL
+)
+LOGGING;
+
+ALTER TABLE internare_medicament_relmxn ADD CONSTRAINT internare_medicament_relmxn_pk PRIMARY KEY ( internare_nr_internare,
+                                                                                                    medicament_id_medicament );
+
+CREATE TABLE manopera (
+    id_manopera NUMBER(2) NOT NULL,
+    tip         VARCHAR2(20) NOT NULL,
+    pret        NUMBER(3) NOT NULL
+)
+LOGGING;
+
+
+ALTER TABLE manopera
+    ADD CONSTRAINT manopera_pret_ck CHECK ( mod(pret, 5) = 0 );
+
+ALTER TABLE manopera ADD CONSTRAINT manopera_pk PRIMARY KEY ( id_manopera );
+
+ALTER TABLE manopera ADD CONSTRAINT manopera_tip_un UNIQUE ( tip );
+
+CREATE TABLE medicament (
+    id_medicament NUMBER(2) NOT NULL,
+    denumire      VARCHAR2(25) NOT NULL,
+    pret          NUMBER(3) NOT NULL
+)
+LOGGING;
+
+ALTER TABLE medicament
+    ADD CONSTRAINT medicament_denumire_ck CHECK ( length(denumire) > 2 );
+
+ALTER TABLE medicament
+    ADD CONSTRAINT medicament_pret_ck CHECK ( mod(pret, 5) = 0 );
+
+ALTER TABLE medicament ADD CONSTRAINT medicament_pk PRIMARY KEY ( id_medicament );
+
+ALTER TABLE medicament ADD CONSTRAINT medicament_denumire_un UNIQUE ( denumire );
+
+CREATE TABLE pacient (
+    id_pacient    NUMBER(2) NOT NULL,
+    nume          VARCHAR2(40) NOT NULL,
+    data_nasterii DATE NOT NULL,
+    nr_telefon    CHAR(10) NOT NULL,
+    oras          VARCHAR2(20),
+    sex           CHAR(1),
+    email         VARCHAR2(40)
+)
+LOGGING;
+
+ALTER TABLE pacient
+    ADD CONSTRAINT pacient_nume_ck CHECK ( length(nume) > 1
+                                           AND REGEXP_LIKE ( nume,
+                                                             '^[A-Z][a-z]+ [A-Z][a-z]+$' ) );
+
+ALTER TABLE pacient
+    ADD CONSTRAINT pacient_nr_telefon_ck CHECK ( nr_telefon LIKE ( '07%' )
+                                                 AND REGEXP_LIKE ( nr_telefon,
+                                                                   '[0-9]+' )
+                                                 AND length(nr_telefon) = 10 );
+
+ALTER TABLE pacient
+    ADD CONSTRAINT pacient_oras_ck CHECK ( length(oras) > 2
+                                           AND REGEXP_LIKE ( oras,
+                                                             '^[A-Z].+$' ) );
+
+ALTER TABLE pacient
+    ADD CONSTRAINT pacient_sex_ck CHECK ( sex IN ( 'F', 'M' ) );
+
+ALTER TABLE pacient
+    ADD CONSTRAINT pacient_email_ck CHECK ( REGEXP_LIKE ( email,
+                                                          '[a-z0-9._%-]+@[a-z0-9._%-]+\.[a-z]{2,4}' ) );
+
+ALTER TABLE pacient ADD CONSTRAINT pacient_pk PRIMARY KEY ( id_pacient );
+
+CREATE TABLE sectie (
+    id_sectie NUMBER(2) NOT NULL,
+    denumire  VARCHAR2(20) NOT NULL
+)
+LOGGING;
+
+
+ALTER TABLE sectie ADD CONSTRAINT sectie_pk PRIMARY KEY ( id_sectie );
+
+ALTER TABLE sectie ADD CONSTRAINT sectie_denumire_un UNIQUE ( denumire );
+
+ALTER TABLE cont
+    ADD CONSTRAINT cont_pacient_fk FOREIGN KEY ( pacient_id_pacient )
+        REFERENCES pacient ( id_pacient )
+    NOT DEFERRABLE;
+
+ALTER TABLE internare_medicament_relmxn
+    ADD CONSTRAINT int_medic_relmxn_int_fk FOREIGN KEY ( internare_nr_internare )
+        REFERENCES internare ( nr_internare )
+    NOT DEFERRABLE;
+
+ALTER TABLE internare_medicament_relmxn
+    ADD CONSTRAINT int_medic_relmxn_medic_fk FOREIGN KEY ( medicament_id_medicament )
+        REFERENCES medicament ( id_medicament )
+    NOT DEFERRABLE;
+
+ALTER TABLE internare
+    ADD CONSTRAINT internare_boala_fk FOREIGN KEY ( boala_id_boala )
+        REFERENCES boala ( id_boala )
+    NOT DEFERRABLE;
+
+ALTER TABLE internare
+    ADD CONSTRAINT internare_manopera_fk FOREIGN KEY ( manopera_id_manopera )
+        REFERENCES manopera ( id_manopera )
+    NOT DEFERRABLE;
+
+ALTER TABLE internare
+    ADD CONSTRAINT internare_pacient_fk FOREIGN KEY ( pacient_id_pacient )
+        REFERENCES pacient ( id_pacient )
+    NOT DEFERRABLE;
+
+ALTER TABLE internare
+    ADD CONSTRAINT internare_sectie_fk FOREIGN KEY ( sectie_id_sectie )
+        REFERENCES sectie ( id_sectie )
+    NOT DEFERRABLE;
+
+CREATE OR REPLACE TRIGGER trg_Internare_data_internare 
+    BEFORE INSERT OR UPDATE ON Internare 
+    FOR EACH ROW 
+BEGIN
+	IF( :new.data_internare > SYSDATE )
+	THEN
+		RAISE_APPLICATION_ERROR( -20001,
+			'Data invalida: ' || TO_CHAR( :new.data_internare, 'DD.MM.YYYY HH24:MI:SS' ) || ' trebuie sa fie mai mica decat data curenta.' );
+	END IF;
+END; 
+/
+
+CREATE OR REPLACE TRIGGER trg_Pacient_data_nasterii 
+    BEFORE INSERT OR UPDATE ON Pacient 
+    FOR EACH ROW 
+BEGIN
+	IF( ADD_MONTHS(:new.data_nasterii, 6) > SYSDATE )
+	THEN
+		RAISE_APPLICATION_ERROR( -20001,
+			'Data invalida: ' || TO_CHAR( :new.data_nasterii, 'DD.MM.YYYY HH24:MI:SS' ) || ' trebuie sa fie cu macar 6 luni mai devreme decat data curenta.' );
+	END IF;
+END; 
+/
+
+CREATE SEQUENCE boala_id_boala_seq START WITH 1 NOCACHE ORDER;
+
+CREATE OR REPLACE TRIGGER boala_id_boala_trg BEFORE
+    INSERT ON boala
+    FOR EACH ROW
+    WHEN ( new.id_boala IS NULL )
+BEGIN
+    :new.id_boala := boala_id_boala_seq.nextval;
+END;
+/
+
+CREATE SEQUENCE internare_nr_internare_seq START WITH 1 NOCACHE ORDER;
+
+CREATE OR REPLACE TRIGGER internare_nr_internare_trg BEFORE
+    INSERT ON internare
+    FOR EACH ROW
+    WHEN ( new.nr_internare IS NULL )
+BEGIN
+    :new.nr_internare := internare_nr_internare_seq.nextval;
+END;
+/
+
+CREATE SEQUENCE manopera_id_manopera_seq START WITH 1 NOCACHE ORDER;
+
+CREATE OR REPLACE TRIGGER manopera_id_manopera_trg BEFORE
+    INSERT ON manopera
+    FOR EACH ROW
+    WHEN ( new.id_manopera IS NULL )
+BEGIN
+    :new.id_manopera := manopera_id_manopera_seq.nextval;
+END;
+/
+
+CREATE SEQUENCE medicament_id_medicament_seq START WITH 1 NOCACHE ORDER;
+
+CREATE OR REPLACE TRIGGER medicament_id_medicament_trg BEFORE
+    INSERT ON medicament
+    FOR EACH ROW
+    WHEN ( new.id_medicament IS NULL )
+BEGIN
+    :new.id_medicament := medicament_id_medicament_seq.nextval;
+END;
+/
+
+CREATE SEQUENCE pacient_id_pacient_seq START WITH 1 NOCACHE ORDER;
+
+CREATE OR REPLACE TRIGGER pacient_id_pacient_trg BEFORE
+    INSERT ON pacient
+    FOR EACH ROW
+    WHEN ( new.id_pacient IS NULL )
+BEGIN
+    :new.id_pacient := pacient_id_pacient_seq.nextval;
+END;
+/
+
+CREATE SEQUENCE sectie_id_sectie_seq START WITH 1 NOCACHE ORDER;
+
+CREATE OR REPLACE TRIGGER sectie_id_sectie_trg BEFORE
+    INSERT ON sectie
+    FOR EACH ROW
+    WHEN ( new.id_sectie IS NULL )
+BEGIN
+    :new.id_sectie := sectie_id_sectie_seq.nextval;
+END;
+/

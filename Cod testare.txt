@@ -1,0 +1,72 @@
+-- Testare functionalitate
+
+-- 1) Numarul total al pacientilor internati la o anumita sectie -> vom face pt cardiologie
+SELECT COUNT(*) as "Internari cardiologie"
+FROM pacient p, internare i
+WHERE p.ID_pacient = i.Pacient_ID_pacient
+    AND i.Sectie_ID_sectie = 1;
+    
+-- 2) Media varstelor (ani) a pacientilor internati la fiecare sectie intr-un anumit an -> vom face pt 2020
+SELECT s.denumire, AVG((i.data_internare - p.data_nasterii) / 365)
+FROM pacient p, internare i, sectie s
+WHERE p.ID_pacient = i.Pacient_ID_pacient AND i.Sectie_ID_sectie = s.ID_Sectie
+    AND TO_CHAR(i.data_internare, 'YYYY') = '2020'
+GROUP BY s.denumire;
+
+-- 3) Suma totala de bani incasata pe vanzarea medicamentelor intr-un anumit an -> vom face pt 2021
+SELECT SUM(m.pret * imr.cantitate) as "Suma bani incasata pe medicamente"
+FROM internare i, medicament m, internare_medicament_relmxn imr
+WHERE imr.Internare_nr_internare = i.nr_internare AND imr.Medicament_ID_medicament = m.ID_medicament
+    AND TO_CHAR(i.data_internare, 'YYYY') = '2021';
+    
+-- 4) Boala (bolile) cea (cele) mai frecventa(e) in istoria internarilor in clinica (indiferent de gravitate)
+SELECT b.denumire as "Denumire boala", COUNT(*) as "Frecventa boala"
+FROM boala b, internare i
+WHERE i.Boala_ID_boala = b.ID_boala
+GROUP BY b.denumire
+HAVING COUNT(*) = (SELECT MAX(COUNT(*))
+                    FROM internare i, boala b
+                    WHERE i.Boala_ID_boala = b.ID_boala
+                    GROUP BY b.denumire);
+
+-- 5) Proportia pacientilor care au intampinat forme usoare ale unor boli
+SELECT tabela2.nr_usor * 100 / tabela1.nr_tot || '%' as "Procentaj pacienti cu forma usoar a bolii" 
+FROM 
+    (SELECT COUNT(*) nr_tot FROM internare) tabela1,
+    (SELECT COUNT(*) nr_usor FROM internare i, boala b WHERE i.Boala_ID_boala = b.ID_boala AND b.severitate = 'usor') tabela2;
+    
+-- 6) Care este medicamentul cu cea mai mare cantitate vanduta pana in prezent
+SELECT m.denumire, SUM(cantitate) as "Cantitate Max"
+FROM internare i, internare_medicament_relmxn imr, medicament m
+WHERE imr.Internare_nr_internare = i.nr_internare AND imr.Medicament_ID_medicament = m.ID_medicament
+GROUP BY m.denumire
+HAVING SUM(cantitate) = (SELECT MAX(SUM(cantitate)) FROM internare_medicament_relmxn GROUP BY Medicament_ID_medicament);
+
+-- 7) Care sunt sectiile cu cele mai multe internari pana in prezent
+SELECT s.denumire, COUNT(*) as "Numar de internari"
+FROM internare i, sectie s
+WHERE i.Sectie_ID_sectie = s.ID_sectie
+GROUP BY s.denumire
+HAVING COUNT(*) = (SELECT MAX(COUNT(*)) FROM internare GROUP BY Sectie_ID_sectie);
+
+
+-- Verificare constrangeri
+
+-- 1) CHECK severitate violated (poate lua doar valorile 'usor', 'moderat' si 'grav')
+UPDATE boala
+SET severitate = 'foarte grav'
+WHERE denumire = 'leziune piele';
+
+-- 2) CHECH email violated
+UPDATE pacient
+SET email='emailfaraarond'
+WHERE ID_pacient = 3;
+
+-- 3) TRIGGER data_nasterii (nu putem avea pacienti cu varsta mai mica decat 6 luni)
+INSERT INTO pacient VALUES (NULL, 'Andrei Codrin', '15-OCT-2021', '0712345678', NULL, NULL, NULL);
+
+-- 4) CHECK nume violated (numele trebuie sa contine macar un nume de familie si un prenume)
+INSERT INTO pacient VALUES (NULL, 'Andrei', '15-OCT-2016', '0712345678', NULL, NULL, NULL);
+
+-- 5) CHECK nume violated (numele nu poate contine cifre)
+INSERT INTO pacient VALUES (NULL, 'Andrei Cosmin2', '15-OCT-2016', '0712345678', NULL, NULL, NULL);
